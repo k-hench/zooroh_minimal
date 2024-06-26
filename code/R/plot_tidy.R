@@ -3,7 +3,7 @@ library(here)
 library(glue)
 library(prismatic)
 library(patchwork)
-library(ggrastr)
+#library(ggrastr)
 theme_set(theme_minimal() +
             theme(axis.line = element_line(linewidth = .25),
                   plot.subtitle = element_text(hjust = .5)))
@@ -57,12 +57,13 @@ p3 <- data_roh |>
   scale_x_continuous(glue("Position on {chrms[[1]]}"),
                      labels = \(x){sprintf("%.0f Mb", x*1e-6)})
 
-data_local_3351 <- read_tsv(here("results/zooroh/local_hdb_prop/loacal_hdb_prop_ES3351.tsv.gz"))
+data_local_3351 <- read_tsv(here("results/zooroh/local_hbd_prop/loacal_hbd_prop_ES3351.tsv.gz"))
 
 p4 <- data_local_3351 |> 
   pivot_longer(cols = -c(pos, sample_id))  |>
   ggplot(aes(x = pos, y =  value, color = name)) +
-  rasterize(geom_line(linewidth = .5), dpi = 300) +
+  #  rasterize(geom_line(linewidth = .5), dpi = 300) +
+  geom_line(linewidth = .5) +
   labs(subtitle = " By SNP for ES3351",
        y = "local HBD probabilities (=uncertainty)") +
   facet_grid(str_remove(name, "^HBD_") ~ .) +

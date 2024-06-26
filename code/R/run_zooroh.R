@@ -9,7 +9,7 @@
 #   results/zooroh/roh_segments.tsv.gz \ 
 #   results/zooroh/inbreeding_by_HBD_class.tsv \
 #   gp bp 7 \
-#   results/zooroh/local_hdb_prop
+#   results/zooroh/local_hbd_prop
 # ---------------------------------
 # snakemake ins-and-outs:
 # input:
@@ -25,7 +25,7 @@
 #           "results/zooroh/roh_segments.tsv.gz",
 #           "results/zooroh/inbreeding_by_HBD_class.tsv",
 #            "gp", "bp", 7,
-#            "results/zooroh/local_hdb_prop" )
+#            "results/zooroh/local_hbd_prop" )
 # ---------------------------------
 
 # --- overhead / logistics ---
@@ -42,13 +42,13 @@ dir.create(path = here(args[[3]]), showWarnings = FALSE)
 file_out_roh <- here(str_remove(args[[4]], "^\\.\\./"))
 file_out_ftab <- here(str_remove(args[[5]], "^\\.\\./"))
 
-# check if local HDB probabilities are wanted
+# check if local HBD probabilities are wanted
 if(length(args) > 8){
-  local_hdb <- TRUE
-  path_out_local_hdb <- here(str_remove(args[[9]], "^\\.\\./"))
-  dir.create(path = path_out_local_hdb, showWarnings = FALSE)
+  local_hbd <- TRUE
+  path_out_local_hbd <- here(str_remove(args[[9]], "^\\.\\./"))
+  dir.create(path = path_out_local_hbd, showWarnings = FALSE)
 } else {
-  local_hdb <- FALSE
+  local_hbd <- FALSE
 }
 
 gt_fmt <- args[[6]]     # [ "gp", "gt" ] note, that bcftools convert TAKES GT but EMITS GP format
@@ -57,8 +57,8 @@ n_threads <- as.integer(args[[8]])
 
 # --- helper functions ---
 
-# extract local HDB prop
-extract_loc_hdb_prop <- \(smp_idx){
+# extract local HBD prop
+extract_loc_hbd_prop <- \(smp_idx){
   as_tibble(t(zoo_results@hbdp[[smp_idx]])) |> 
     set_names(nm = c(glue("HBD_{sprintf('%.0f',k_rates_used[1:(length(k_rates_used)-1)])}"), 'nonHBD')) |> 
     mutate(pos = zoo_dat@bp,
@@ -66,11 +66,11 @@ extract_loc_hdb_prop <- \(smp_idx){
     select(sample_id, pos, everything())
 }
 
-# export local HDB prop to tsv file
-export_loc_hdb_prop <- \(smp_idx){
-  message(cat(glue("Exporting HDB for sample {zoo_dat@sample_ids[[smp_idx]]} ({smp_idx}/{length(zoo_dat@sample_ids)})\n")))
-  extract_loc_hdb_prop(smp_idx) |> 
-    write_tsv(here(glue("{path_out_local_hdb}/loacal_hdb_prop_{zoo_dat@sample_ids[[smp_idx]]}.tsv.gz")))
+# export local HBD prop to tsv file
+export_loc_hbd_prop <- \(smp_idx){
+  message(cat(glue("Exporting HBD for sample {zoo_dat@sample_ids[[smp_idx]]} ({smp_idx}/{length(zoo_dat@sample_ids)})\n")))
+  extract_loc_hbd_prop(smp_idx) |> 
+    write_tsv(here(glue("{path_out_local_hbd}/loacal_hbd_prop_{zoo_dat@sample_ids[[smp_idx]]}.tsv.gz")))
 }
 
 # --- running zooroh ---
@@ -92,14 +92,14 @@ k_rates_used <- rate_choices[[rate_type]]
 # define model
 zoo_model <- zoomodel(K = length(k_rates_used), krates = k_rates_used,err = 0.005)
 # run
-zoo_results <- zoorun(zoomodel = zoo_model, zooin = zoo_dat, nT = n_threads, localhbd = local_hdb)
+zoo_results <- zoorun(zoomodel = zoo_model, zooin = zoo_dat, nT = n_threads, localhbd = local_hbd)
 
 # --- exporting results ---
 
 # zooplot_partitioning(list(test=zoo_results), ylim = c(0,1), nonhbd = TRUE)
 # zooplot_hbdseg(zoo_results, chr = 1, coord=c(0e6,11.5e7))
 
-# extract_loc_hdb_prop(16) |> 
+# extract_loc_hbd_prop(16) |> 
 #   pivot_longer(cols = -c(pos, sample_id))  |> 
 #   ggplot(aes(x = pos, y =  value, color = name)) +
 #   geom_line() +
@@ -130,8 +130,8 @@ zoo_results@hbdseg |>
          HBDclass = zoo_model@krates[HBDclass]) |>
   write_tsv(file_out_roh)
 
-# export local HDB probs if wanted
-if(local_hdb){
+# export local HBD probs if wanted
+if(local_hbd){
   seq_along(zoo_dat@sample_ids) |> 
-    walk(export_loc_hdb_prop)
+    walk(export_loc_hbd_prop)
 }

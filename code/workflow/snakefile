@@ -11,7 +11,9 @@ c_zooroh = config[ 'sif_zooroh' ]
 rule all:
     input: 
       roh = "../results/zooroh/roh_segments.tsv.gz",
-      f_tab = "../results/zooroh/inbreeding_by_HBD_class.tsv"
+      f_tab = "../results/zooroh/inbreeding_by_HBD_class.tsv",
+      loacl_hbd = "../results/zooroh/local_hbd_prop",
+      pdf = "../results/summary.pdf"
 
 # --- worker rules ---
 # for sample names
@@ -71,7 +73,8 @@ rule run_zooroh:
       smpl = "../results/mirang_test.samples"
     output:
       roh = "../results/zooroh/roh_segments.tsv.gz",
-      f_tab = "../results/zooroh/inbreeding_by_HBD_class.tsv"
+      f_tab = "../results/zooroh/inbreeding_by_HBD_class.tsv",
+      local_hbd = directory( "../results/zooroh/local_hbd_prop" )
     params:
       base_dir = "results/zooroh",
       gt_fmt = "gp",
@@ -88,5 +91,19 @@ rule run_zooroh:
         {output.f_tab} \
         {params.gt_fmt} \
         {params.rate_type} \
-        {threads}
+        {threads} \
+        {output.local_hbd}
+      """
+
+rule plot_zooroh_summary:
+    input:
+      roh = "../results/zooroh/roh_segments.tsv.gz",
+      f_tab = "../results/zooroh/inbreeding_by_HBD_class.tsv",
+      local_hbd = "../results/zooroh/local_hbd_prop"
+    output:
+      pdf = "../results/summary.pdf"
+    conda: "r_tidy"
+    shell:
+      """
+      Rscript --vanilla R/plot_tidy.R
       """
