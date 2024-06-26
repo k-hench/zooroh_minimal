@@ -26,7 +26,7 @@ cd code/workflow/envs
 mamba env create -f popgen_basics.yml
 ```
 
-plug in data into the `data` folder (search at the elephant_seal stash...)
+plug in data (`data/mirang_test.vcf.gz`) into the `data` folder (search at the elephant_seal stash...)
 
 ## run
 
