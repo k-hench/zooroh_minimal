@@ -85,5 +85,6 @@ k_rates_used[1:(length(k_rates_used)-1)] |>
 rohbd(zoo_results) |> 
   as_tibble() |> 
   mutate(id = zoo_dat@sample_ids[id], 
-         chrom = zoo_dat@chrnames[chrom]) |> 
+         chrom = zoo_dat@chrnames[chrom],
+         HBDclass = zoo_model@krates[HBDclass]) |> 
   write_tsv(file_out_roh)
