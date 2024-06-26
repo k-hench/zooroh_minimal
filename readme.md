@@ -10,7 +10,7 @@ results/zooroh/
 
 ## setup
 
-Requires `snakemake`, the bash variable `$CDATA` to be set,  one container ([r_zooroh_v0.2](https://hub.docker.com/r/khench/r_zooroh/tags), located at `#CDATA/apptainer_local`), one `conda` environment (`popgen_basics`).
+Requires `snakemake`, the bash variable `${CDATA}` to be set,  one container ([r_zooroh_v0.2](https://hub.docker.com/r/khench/r_zooroh/tags), located at `${CDATA}/apptainer_local`), one `conda` environment (`popgen_basics`).
 
 pull container:
 
