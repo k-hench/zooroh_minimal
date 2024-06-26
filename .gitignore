@@ -1,0 +1,5 @@
+.Rproj.user
+code/.snakemake
+results
+data/*
+!data/readme.md

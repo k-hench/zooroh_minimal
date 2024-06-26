@@ -1,0 +1,2 @@
+# apptainer pull docker://khench/r_zooroh:v0.2
+sif_zooroh: '$CDATA/apptainer_local/r_zooroh_v0.2.sif'

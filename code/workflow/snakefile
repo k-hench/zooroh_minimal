@@ -1,0 +1,92 @@
+"""
+snakemake -n
+snakemake -c 7 --use-conda --use-singularity --singularity-args "--bind $CDATA"
+"""
+
+configfile: "workflow/config.yml"
+# read in container ids
+c_zooroh = config[ 'sif_zooroh' ]
+
+# --- target rule ---
+rule all:
+    input: 
+      roh = "../results/zooroh/roh_segments.tsv.gz",
+      f_tab = "../results/zooroh/inbreeding_by_HBD_class.tsv"
+
+# --- worker rules ---
+# for sample names
+rule idx_vcf:
+    input:
+      vcf = "../data/mirang_test.vcf.gz"
+    output:
+      idx = "../data/mirang_test.vcf.gz.tbi"
+    conda: "popgen_basics"
+    shell:
+      """
+      tabix -p vcf {input.vcf}
+      """ 
+
+# extract sample names
+rule vcf_sample_names:
+    input:
+      vcf = "../data/mirang_test.vcf.gz",
+      idx = "../data/mirang_test.vcf.gz.tbi"
+    output:
+      smpl = "../results/mirang_test.samples"
+    conda: "popgen_basics"
+    shell:
+      """
+      vcfsamplenames {input.vcf} > {output.smpl}
+      """ 
+
+# genotype conversion
+rule convert_vcf_to_geno:
+    input:
+      vcf = "../data/mirang_test.vcf.gz"
+    output:
+      geno = "../results/genotypes/mirang_test.gen.gz",
+      tmp = temp( "../results/genotypes/mirang_test_init.gen.gz" )
+    conda: "popgen_basics"
+    params:
+      prefix = "../results/genotypes/mirang_test"
+    shell:
+      """
+      bcftools convert \
+        -g {params.prefix} \
+        --3N6 \
+        --tag GT \
+        {input.vcf} 
+        
+      mv {params.prefix}.gen.gz {output.tmp}
+    
+      zcat {params.prefix}_init.gen.gz | \
+        sed -e 's/ 0.33/ 0/g' | \
+        gzip > {output.geno}
+      """
+
+# running zooroh with provided R script
+rule run_zooroh:
+    input:
+      geno = "../results/genotypes/mirang_test.gen.gz",
+      smpl = "../results/mirang_test.samples"
+    output:
+      roh = "../results/zooroh/roh_segments.tsv.gz",
+      f_tab = "../results/zooroh/inbreeding_by_HBD_class.tsv"
+    params:
+      base_dir = "results/zooroh",
+      gt_fmt = "gp",
+      rate_type = "bp"
+    threads: 7
+    container: c_zooroh
+    shell:
+      """
+      Rscript --vanilla R/run_zooroh.R \
+        {input.geno} \
+        {input.smpl} \
+        {params.base_dir} \
+        {output.roh} \
+        {output.f_tab} \
+        {params.gt_fmt} \
+        {params.rate_type} \
+        {threads}
+      """
