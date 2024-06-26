@@ -95,6 +95,7 @@ rule run_zooroh:
         {output.local_hbd}
       """
 
+# plotting the zooroh results
 rule plot_zooroh_summary:
     input:
       roh = "../results/zooroh/roh_segments.tsv.gz",
