@@ -10,6 +10,7 @@ c_zooroh = config[ 'sif_zooroh' ]
 # --- target rule ---
 rule all:
     input: 
+      cMgeno = "../results/genotypes/mirang_test_cM.gen.gz",
       roh = "../results/zooroh/roh_segments.tsv.gz",
       f_tab = "../results/zooroh/inbreeding_by_HBD_class.tsv",
       loacl_hbd = "../results/zooroh/local_hbd_prop",
@@ -66,10 +67,23 @@ rule convert_vcf_to_geno:
         gzip > {output.geno}
       """
 
+rule convert_bp_to_cM_positions:
+    input:
+      geno = "../results/genotypes/mirang_test.gen.gz",
+      gmap = "../data/genetic_map_wrongref.bed.gz"
+    output:
+      geno = "../results/genotypes/mirang_test_cM.gen.gz"
+    conda: "py3"
+    threads: 7
+    shell:
+      """
+      py/bp2cm -i {input.geno} -m {input.gmap} -t {threads} --rec-rate-scaling 3000 -o {q.geno}
+      """
+
 # running zooroh with provided R script
 rule run_zooroh:
     input:
-      geno = "../results/genotypes/mirang_test.gen.gz",
+      geno = "../results/genotypes/mirang_test_cM.gen.gz",
       smpl = "../results/mirang_test.samples"
     output:
       roh = "../results/zooroh/roh_segments.tsv.gz",
@@ -78,7 +92,7 @@ rule run_zooroh:
     params:
       base_dir = "results/zooroh",
       gt_fmt = "gp",
-      rate_type = "bp"
+      rate_type = "cM"
     threads: 7
     container: c_zooroh
     shell:

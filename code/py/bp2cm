@@ -1,0 +1,158 @@
+#!/usr/bin/env python
+import argparse
+import numpy as np
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
+
+def process_chromosome_group(chromosome, group, fill_gap_method):
+    cumulative_cM = 0.0
+    parsed_chr_map_list = []
+    
+    for i in range(len(group)):
+        if i == 0:
+            # First entry in the chromosome group
+            start_cM = cumulative_cM
+            distance_bp = group.iloc[i]["end_bp"] - 0.0
+            recomb_rate = group.iloc[i]["recomb_rate_cM_per_bp"]
+            cumulative_cM += distance_bp * recomb_rate
+            end_cM = cumulative_cM
+        else:
+            # Calculate cumulative cM position
+            start_cM = cumulative_cM
+            distance_bp = group.iloc[i]["end_bp"] - group.iloc[i]["start_bp"]
+            recomb_rate = group.iloc[i]["recomb_rate_cM_per_bp"]
+            cumulative_cM += distance_bp * recomb_rate
+            end_cM = cumulative_cM
+        
+        # Append current row to the list
+        parsed_chr_map_list.append(pd.DataFrame({
+            "chromosome": [chromosome],
+            "start_bp": [group.iloc[i]["start_bp"]],
+            "end_bp": [group.iloc[i]["end_bp"]],
+            "recomb_rate": [group.iloc[i]["recomb_rate"]],
+            "recomb_rate_cM_per_bp": [group.iloc[i]["recomb_rate_cM_per_bp"]],
+            "start_cM": [start_cM],
+            "end_cM": [end_cM]
+        }))
+        
+        # Check for gap and fill it if necessary
+        if i < len(group) - 1:
+            gap_start_bp = group.iloc[i]["end_bp"]
+            gap_end_bp = group.iloc[i+1]["start_bp"]
+            if gap_end_bp - gap_start_bp > 0:
+                gap_distance_bp = gap_end_bp - gap_start_bp
+                if fill_gap_method == "zero":
+                    gap_recomb_rate = 0.0
+                elif fill_gap_method == "average":
+                    gap_recomb_rate = (group.iloc[i]["recomb_rate_cM_per_bp"] + group.iloc[i+1]["recomb_rate_cM_per_bp"]) / 2
+                gap_start_cM = cumulative_cM
+                cumulative_cM += gap_distance_bp * gap_recomb_rate
+                # Add gap row to the parsed map DataFrame
+                gap_row = pd.DataFrame({
+                    "chromosome": [chromosome],
+                    "start_bp": [gap_start_bp],
+                    "end_bp": [gap_end_bp],
+                    "recomb_rate": [gap_recomb_rate * 1e6],
+                    "recomb_rate_cM_per_bp": [gap_recomb_rate],
+                    "start_cM": [gap_start_cM],
+                    "end_cM": [cumulative_cM]
+                })
+                if not gap_row.empty:  # Check if gap_row is not empty
+                    parsed_chr_map_list.append(gap_row)
+    
+    # Merge all rows within chromosome
+    parsed_chr_map = pd.concat(parsed_chr_map_list)
+    return parsed_chr_map
+
+def parse_genetic_map(genetic_map, scaling_factor=1.0, fill_gap_method="zero", num_threads=1):
+    parsed_map_list = []
+    genetic_map["recomb_rate_cM_per_bp"] = (genetic_map["recomb_rate"] / 1e6) * scaling_factor
+    grouped_map = genetic_map.groupby("chromosome")
+
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = {executor.submit(process_chromosome_group, chromosome, group, fill_gap_method): chromosome for chromosome, group in grouped_map}
+        for future in futures:
+            parsed_map_list.append(future.result())
+
+    # Merge all chromosomes to create the main parsed map DataFrame
+    parsed_map = pd.concat(parsed_map_list)
+    return parsed_map
+
+def interpolate_cM(chromosome, position, genetic_map):
+    chr_map = genetic_map[genetic_map["chromosome"] == chromosome]
+    if chr_map.empty:
+        return np.nan
+    min_bp = chr_map["start_bp"].min()
+    max_bp = chr_map["end_bp"].max()
+    max_cM = chr_map["end_cM"].max()
+    if position < min_bp:
+        return 0.0
+    elif position > max_bp:
+        return max_cM
+    row = chr_map[(chr_map["start_bp"] <= position) & (chr_map["end_bp"] >= position)]
+    if row.empty:
+        return np.nan
+    row = row.iloc[0]
+    cM_position = row["start_cM"] + (position - row["start_bp"]) * row["recomb_rate_cM_per_bp"]
+    return cM_position
+
+def process_snp_group(group, genetic_map):
+    group["cM_position"] = group.apply(lambda row: interpolate_cM(row["chromosome"], row["position"], genetic_map), axis=1)
+    return group
+
+def main():
+    parser = argparse.ArgumentParser(description="Convert genomic coordinates from base pair positions (bp) to centi Morgan (cM) using a genetic map in bed format.")
+    parser.add_argument('-i', '--in', dest="input_file", required=True, help="Tab-delimited input file, can be bgzipped (deduced from '.gz' suffix). First column needs to be the sequence name, the second column needs to be the bp positions.")
+    parser.add_argument('-m', '--genetic-map', dest="map_file", required=True, help="Bed file with recombination rates r (cM/Mb, can be gzipped deduced from '.gz' suffix).")
+    parser.add_argument('-o', '--output', dest="output_file", default="/dev/stdout", help="Output pi values in `tsv` format (default: stdout, can be gzipped, deduced from '.gz' suffix)")
+    parser.add_argument('-e', '--export-map-to', dest="map_out", default="", help="If specified (eg. 'annotated_map.tsv') cumulative recombination map is saved to this file  (default: not specified, can be gzipped, deduced from trailing '.gz' suffix)")
+    parser.add_argument('-s', '--rec-rate-scaling', dest="scaling_factor", default=1.0, help="Scaling factor for the recombination rate of the genetic map (default: 1.0)")
+    parser.add_argument('-t', '--threads', dest="num_threads", default=1, type=int, help="Number of threads for parallel processing (default: 1)")
+    parser.add_argument('-g', '--gaps-method', dest="gaps_method", default="zero", choices=['zero', 'average'], type=str, help="Method to interpolate gaps in genetic map (default: zero)")
+
+    args = parser.parse_args()
+    
+    # in_file = "results/genotypes/dummy.gen.gz"
+    in_file = args.input_file
+    # map_file = "data/genetic_map_head.bed.gz"
+    map_file = args.map_file
+    map_out = args.map_out
+    # output_file = "results/genotypes/dummy_cm.gen.gz"
+    output_file = args.output_file
+    # num_threads = 4
+    num_threads = args.num_threads
+    
+    genetic_bed = pd.read_csv(map_file, sep="\t", header=None,
+                              names=["chromosome", "start_bp", "end_bp", "rho", "recomb_rate"])
+    
+    # genetic_map = parse_genetic_map(genetic_bed, float(1000), "average", 4)
+    genetic_map = parse_genetic_map(genetic_bed, float(args.scaling_factor), args.gaps_method, num_threads)
+    
+    if map_out:
+        if map_out.endswith('.gz'):
+            genetic_map.to_csv(map_out, sep=' ', index=False, na_rep='NA', compression='gzip')
+        else:
+            genetic_map.to_csv(map_out, sep=' ', index=False, na_rep='NA') 
+    
+    org_data = pd.read_csv(in_file, sep=" ", header = None)
+    
+    coords = org_data.iloc[:,:6]
+    coords.columns = ["chromosome", "snp_id", "rsID", "position", "ref", "alt" ]
+    
+    grouped_coords = coords.groupby("chromosome")
+
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = [executor.submit(process_snp_group, group, genetic_map) for _, group in grouped_coords]
+        results = [future.result() for future in futures]
+    
+    coords_with_cM = pd.concat(results)
+    
+    full_out_table = pd.concat([coords_with_cM, org_data.iloc[:,6:]], axis=1)
+
+    if output_file.endswith('.gz'):
+        full_out_table.to_csv(output_file, sep=' ', index=False, na_rep='NA', compression='gzip', header = None)
+    else:
+        full_out_table.to_csv(output_file, sep=' ', index=False, na_rep='NA', header = None)
+
+if __name__ == "__main__":
+    main()

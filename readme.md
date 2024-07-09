@@ -34,5 +34,8 @@ execute the pipeline from the `code` directory
 
 ```sh
 cd code
-snakemake -c 7 --use-conda --use-singularity --singularity-args "--bind $CDATA"
+
+snakemake -c 7 \
+  --use-conda --use-singularity \
+  --singularity-args "--bind $CDATA"
 ```

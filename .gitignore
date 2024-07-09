@@ -3,3 +3,4 @@ code/.snakemake
 results
 data/*
 !data/readme.md
+code/R/snippets.R

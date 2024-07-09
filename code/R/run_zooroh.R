@@ -55,6 +55,16 @@ gt_fmt <- args[[6]]     # [ "gp", "gt" ] note, that bcftools convert TAKES GT bu
 rate_type <- args[[7]]  # [ "bp", "cM" ] check if your genotypes are living in "bp" or "cM" land
 n_threads <- as.integer(args[[8]])
 
+if(rate_type == "bp"){
+  pos_col_idx <- 4
+  n_col <- 6
+} else if(rate_type == "cM"){
+  pos_col_idx <- 7
+  n_col <- 7
+} else {
+  stop(glue("ERROR: rate type needs to be either 'bp' or 'cM', detected: '{rate_type}' instead."))
+}
+
 # --- helper functions ---
 
 # extract local HBD prop
@@ -76,8 +86,8 @@ export_loc_hbd_prop <- \(smp_idx){
 # --- running zooroh ---
 # importing data
 zoo_dat <- zoodata(genofile = file_gen,
-                   supcol = 6,
-                   poscol = 4,
+                   supcol = n_col,
+                   poscol = pos_col_idx,
                    chrcol = 1,
                    zformat = gt_fmt,
                    samplefile = file_smpl)
