@@ -112,12 +112,12 @@ def main():
 
     args = parser.parse_args()
     
-    # in_file = "results/genotypes/dummy.gen.gz"
+    # in_file = "results/genotypes/mirang_test.gen.gz"
     in_file = args.input_file
-    # map_file = "data/genetic_map_head.bed.gz"
+    # map_file = "data/genetic_map_wrongref_norm.bed.gz"
     map_file = args.map_file
     map_out = args.map_out
-    # output_file = "results/genotypes/dummy_cm.gen.gz"
+    # output_file = "results/genotypes/mirang_test_cM.gen.gz"
     output_file = args.output_file
     # num_threads = 4
     num_threads = args.num_threads
@@ -126,6 +126,7 @@ def main():
                               names=["chromosome", "start_bp", "end_bp", "rho", "recomb_rate"])
     
     # genetic_map = parse_genetic_map(genetic_bed, float(1000), "average", 4)
+    # genetic_map = parse_genetic_map(genetic_bed, float(1), "average", 4)
     genetic_map = parse_genetic_map(genetic_bed, float(args.scaling_factor), args.gaps_method, num_threads)
     
     if map_out:

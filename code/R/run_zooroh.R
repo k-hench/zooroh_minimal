@@ -19,12 +19,12 @@
 #   r_plot_r = "../results/img/R/.Rds"
 # ---------------------------------
 # interactive quick-start copy-and-paste template
-# args <- c("results/genotypes/mirang_test.gen.gz",
+# args <- c("results/genotypes/mirang_test_cM_noNA.gen.gz",
 #           "results/mirang_test.samples",
 #           "results/zooroh",
 #           "results/zooroh/roh_segments.tsv.gz",
 #           "results/zooroh/inbreeding_by_HBD_class.tsv",
-#            "gp", "bp", 7,
+#            "gp", "cM", 7,
 #            "results/zooroh/local_hbd_prop" )
 # ---------------------------------
 
@@ -100,7 +100,7 @@ rate_choices <- list(cM = default_rates, bp = bp_rates)
 # set rate type
 k_rates_used <- rate_choices[[rate_type]]
 # define model
-zoo_model <- zoomodel(K = length(k_rates_used), krates = k_rates_used,err = 0.005)
+zoo_model <- zoomodel(K = length(k_rates_used), krates = k_rates_used,seqerr = 0.005)
 # run
 zoo_results <- zoorun(zoomodel = zoo_model, zooin = zoo_dat, nT = n_threads, localhbd = local_hbd)
 

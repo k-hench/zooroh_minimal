@@ -3,6 +3,8 @@ snakemake -n
 snakemake -c 7 --use-conda --use-singularity --singularity-args "--bind $CDATA"
 """
 
+base_name = "variants.argaz.mscaf_a1_01"
+
 configfile: "workflow/config.yml"
 # read in container ids
 c_zooroh = config[ 'sif_zooroh' ]
@@ -10,7 +12,7 @@ c_zooroh = config[ 'sif_zooroh' ]
 # --- target rule ---
 rule all:
     input: 
-      cMgeno = "../results/genotypes/mirang_test_cM.gen.gz",
+      cMgeno = "../results/genotypes/{nm}_cM.gen.gz".format( nm = base_name ),
       roh = "../results/zooroh/roh_segments.tsv.gz",
       f_tab = "../results/zooroh/inbreeding_by_HBD_class.tsv",
       loacl_hbd = "../results/zooroh/local_hbd_prop",
@@ -20,9 +22,9 @@ rule all:
 # for sample names
 rule idx_vcf:
     input:
-      vcf = "../data/mirang_test.vcf.gz"
+      vcf = "../data/{nm}.vcf.gz".format( nm = base_name )
     output:
-      idx = "../data/mirang_test.vcf.gz.tbi"
+      idx = "../data/{nm}.vcf.gz.tbi".format( nm = base_name )
     conda: "popgen_basics"
     shell:
       """
@@ -32,10 +34,10 @@ rule idx_vcf:
 # extract sample names
 rule vcf_sample_names:
     input:
-      vcf = "../data/mirang_test.vcf.gz",
-      idx = "../data/mirang_test.vcf.gz.tbi"
+      vcf = "../data/{nm}.vcf.gz".format( nm = base_name ),
+      idx = "../data/{nm}.vcf.gz.tbi".format( nm = base_name )
     output:
-      smpl = "../results/mirang_test.samples"
+      smpl = "../results/{nm}.samples".format( nm = base_name )
     conda: "popgen_basics"
     shell:
       """
@@ -45,13 +47,13 @@ rule vcf_sample_names:
 # genotype conversion
 rule convert_vcf_to_geno:
     input:
-      vcf = "../data/mirang_test.vcf.gz"
+      vcf = "../data/{nm}.vcf.gz".format( nm = base_name )
     output:
-      geno = "../results/genotypes/mirang_test.gen.gz",
-      tmp = temp( "../results/genotypes/mirang_test_init.gen.gz" )
+      geno = "../results/genotypes/{nm}.gen.gz".format( nm = base_name ),
+      tmp = temp( "../results/genotypes/{nm}_init.gen.gz".format( nm = base_name ) )
     conda: "popgen_basics"
     params:
-      prefix = "../results/genotypes/mirang_test"
+      prefix = "../results/genotypes/{nm}".format( nm = base_name )
     shell:
       """
       bcftools convert \
@@ -67,24 +69,38 @@ rule convert_vcf_to_geno:
         gzip > {output.geno}
       """
 
+rule tsv_genetic_map:
+    input:
+      tsv = "../data/normalized_genetic_map.mscaf_a1_01.tsv.gz"
+    output:
+      gmap = "../results/genetic_map_norm.bed.gz"
+    conda: "popgen_basics"
+    shell:
+      """
+      zcat {input.tsv} | \
+        cut -f 1-4,10 | \
+        awk -v OFS='\t' '{{if(NR>1){{print $0}} }}' | \
+        bgzip > {output.gmap}
+      """
+
 rule convert_bp_to_cM_positions:
     input:
-      geno = "../results/genotypes/mirang_test.gen.gz",
-      gmap = "../data/genetic_map_wrongref.bed.gz"
+      geno = "../results/genotypes/{nm}.gen.gz".format( nm = base_name ),
+      gmap = "../results/genetic_map_norm.bed.gz"
     output:
-      geno = "../results/genotypes/mirang_test_cM.gen.gz"
+      geno = "../results/genotypes/{nm}_cM.gen.gz".format( nm = base_name )
     conda: "py3"
     threads: 7
     shell:
       """
-      py/bp2cm -i {input.geno} -m {input.gmap} -t {threads} --rec-rate-scaling 3000 -o {q.geno}
+      py/bp2cm -i {input.geno} -m {input.gmap} -t {threads} -o {output.geno}
       """
 
 # running zooroh with provided R script
 rule run_zooroh:
     input:
-      geno = "../results/genotypes/mirang_test_cM.gen.gz",
-      smpl = "../results/mirang_test.samples"
+      geno = "../results/genotypes/{nm}_cM.gen.gz".format( nm = base_name ),
+      smpl = "../results/{nm}.samples".format( nm = base_name )
     output:
       roh = "../results/zooroh/roh_segments.tsv.gz",
       f_tab = "../results/zooroh/inbreeding_by_HBD_class.tsv",
@@ -117,8 +133,10 @@ rule plot_zooroh_summary:
       local_hbd = "../results/zooroh/local_hbd_prop"
     output:
       pdf = "../results/summary.pdf"
+    params:
+      focal_sample = "AGF00014"
     conda: "r_tidy"
     shell:
       """
-      Rscript --vanilla R/plot_tidy.R
+      Rscript --vanilla R/plot_tidy.R {params.focal_sample}
       """
